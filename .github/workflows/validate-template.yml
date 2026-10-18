@@ -1,0 +1,104 @@
+name: Validate Template
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  validate-template:
+    name: Scaffold, Quality Gates & Docker
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          version: "latest"
+          enable-cache: true
+
+      - name: Set up Python
+        run: uv python install 3.12 3.13
+
+      - name: Set up Git Identity
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Install Copier via uv
+        run: uv tool install copier
+
+      - name: Test 1 - Scaffold with pure defaults
+        run: |
+          uv tool run copier copy --trust --defaults . /tmp/test-project-default
+          test -d /tmp/test-project-default/.git
+          test -f /tmp/test-project-default/pyproject.toml
+          test -f /tmp/test-project-default/uv.lock
+          test -f /tmp/test-project-default/README.md
+
+      - name: Test 1 - Run Quality Gates & Tests
+        working-directory: /tmp/test-project-default
+        run: |
+          uv run pytest
+          uv run ruff check .
+          uv run ruff format --check .
+          uv run pyright
+          uv run meu-projeto
+          uv tool run pre-commit run --all-files
+
+      - name: Test 1 - Verify Parquet I/O with PyArrow
+        working-directory: /tmp/test-project-default
+        run: |
+          uv run python -c "
+          import pandas as pd
+          from meu_projeto.config import INTERIM_DATA_DIR
+          df = pd.DataFrame({'feature_a': [1.0, 2.0], 'feature_b': ['alpha', 'beta']})
+          p = INTERIM_DATA_DIR / 'test.parquet'
+          df.to_parquet(p)
+          df_read = pd.read_parquet(p)
+          assert len(df_read) == 2
+          print('Parquet I/O verified successfully.')
+          "
+
+      - name: Test 2 - Verify Copier Update Lifecycle
+        working-directory: /tmp/test-project-default
+        run: |
+          uv tool run copier update --trust --defaults
+
+      - name: Test 3 - Parameterized Scaffold (Python 3.13, Custom Names)
+        run: |
+          uv tool run copier copy --trust --defaults \
+            -d project_name="previsao-churn" \
+            -d package_name="previsao_churn" \
+            -d python_version="3.13" \
+            . /tmp/test-project-custom
+          cd /tmp/test-project-custom
+          uv run pytest
+          uv run previsao-churn
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Test 4 - Build Multi-Stage Docker Image
+        run: |
+          docker build -t test-ds-app:ci /tmp/test-project-default
+
+      - name: Test 4 - Run Container & Verify Non-Root User (UID 1001)
+        run: |
+          USER_UID=$(docker run --rm test-ds-app:ci id -u)
+          echo "Container User UID: $USER_UID"
+          test "$USER_UID" = "1001"
+          docker run --rm test-ds-app:ci

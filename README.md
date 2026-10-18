@@ -1,5 +1,6 @@
 # Data Science Project Template (Copier + uv)
 
+[![Validate Template](https://github.com/RicsonRamos/ds-template/actions/workflows/validate-template.yml/badge.svg)](https://github.com/RicsonRamos/ds-template/actions/workflows/validate-template.yml)
 [![Copier](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/copier-org/copier/master/img/badge/badge-grayscale-inverted.json)](https://github.com/copier-org/copier)
 [![uv](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/uv/main/assets/badge/v0.json)](https://github.com/astral-sh/uv)
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
@@ -20,9 +21,12 @@ Template de arquitetura moderna, modular e reproduzível para projetos de **Ciê
   - [1. Gerando um Novo Projeto](#1-gerando-um-novo-projeto)
   - [2. Publicando e Versionando o Template](#2-publicando-e-versionando-o-template)
   - [3. Atualizando Projetos Existentes (copier update)](#3-atualizando-projetos-existentes-copier-update)
+- [Segurança & Auditoria de Tarefas (_tasks)](#-segurança--auditoria-de-tarefas-_tasks)
+- [Governança e Reprodutibilidade de Dados](#-governança-e-reprodutibilidade-de-dados)
 - [Qualidade de Código & CI/CD](#-qualidade-de-código--cicd)
   - [Pre-commit & Pre-push](#pre-commit--pre-push)
   - [GitHub Actions CI](#github-actions-ci)
+- [Contêinerização de Produção com Docker & UV](#-contêinerização-de-produção-com-docker--uv)
 - [Testes Locais do Template](#-testes-locais-do-template)
 
 ---
@@ -33,7 +37,7 @@ Template de arquitetura moderna, modular e reproduzível para projetos de **Ciê
 Diferente do Cookiecutter (que opera como gerador estático unidirecional), o **Copier** mantém o estado da geração gravado no arquivo de respostas (`.copier-answers.yml`). Isso confere diferenciais críticos:
 - **Evolução Contínua (`copier update`):** Quando regras de linting, scripts de CI, hooks de pre-commit ou dependências base são aprimorados no template, projetos antigos podem receber as atualizações via algoritmo de *three-way merge* sem sobrescrever código de negócio ou análises já desenvolvidas.
 - **Automação Pós-Geração (`_tasks`):** Execução determinística de comandos do sistema imediatamente após o scaffold (`git init`, `uv sync`, instalação de hooks do Git).
-- **Estrutura Direta na Raiz (`_exclude`):** Todos os arquivos de template residem na raiz do repositório, com exclusão declarativa em `copier.yml` para metadados internos (`_exclude: ["copier.yml", "README.md", ".git"]`).
+- **Estrutura Direta na Raiz (`_exclude`):** Todos os arquivos de template residem na raiz do repositório, com exclusão declarativa em `copier.yml` para metadados internos (`_exclude: [".git", ".git/**", ".github/workflows/validate-template.yml", "copier.yml"]`).
 
 ### 2. uv: Ecossistema Python Unificado em Rust
 - Gerenciamento ultrarrápido de dependências e ambientes virtuais (`.venv`).
@@ -58,7 +62,8 @@ ds-template/
 ├── .env.example                                # Variáveis de ambiente de exemplo
 ├── .github/
 │   └── workflows/
-│       └── ci.yml.jinja                        # Workflow GitHub Actions com setup-uv e checagens completas
+│       ├── ci.yml.jinja                        # CI dos projetos gerados (setup-uv, checagens completas)
+│       └── validate-template.yml               # CI do template gerador (testa scaffold, CI e Docker)
 ├── .gitignore                                  # Gitignore com exclusões específicas de Data Science
 ├── .pre-commit-config.yaml                     # Configuração de hooks git (nbstripout, ruff, pyright)
 ├── .python-version.jinja                       # Posição da versão do Python selecionada
@@ -96,8 +101,8 @@ O arquivo `copier.yml` solicita as seguintes configurações no momento da cria�
 
 | Variável | Tipo | Descrição | Validação / Default |
 | :--- | :--- | :--- | :--- |
-| `project_name` | `str` | Nome do repositório/projeto | Regex: `^[a-z][a-z0-9\-]+$` (apenas minúsculas, números e hífens) |
-| `package_name` | `str` | Nome do módulo Python em `src/` | Default: `project_name` com `-` substituído por `_`. Validação: `^[a-z][a-z0-9_]+$` |
+| `project_name` | `str` | Nome do repositório/projeto | Default: `"meu-projeto"`. Regex: `^[a-z][a-z0-9\-]*$` (letras minúsculas, números e hífens) |
+| `package_name` | `str` | Nome do módulo Python em `src/` | Default: `project_name` com `-` substituído por `_`. Regex: `^[a-z][a-z0-9_]*$` |
 | `description` | `str` | Descrição sucinta do projeto | Default: `"Projeto de Ciência de Dados e Machine Learning"` |
 | `author_name` | `str` | Nome do autor/mantenedor | Default: `"Seu Nome"` |
 | `author_email`| `str` | E-mail do autor | Default: `"seu@email.com"` |
@@ -183,6 +188,46 @@ O Copier lê o `.copier-answers.yml`, calcula o *diff* entre as versões do temp
 
 ---
 
+## 🔒 Segurança & Auditoria de Tarefas (`_tasks`)
+
+Por segurança, o Copier requer a flag `--trust` para executar qualquer template que contenha diretivas `_tasks`. Isso garante que o usuário esteja ciente de que scripts do sistema operacional serão executados em sua máquina.
+
+### Comandos Executados na Inicialização
+
+O manifesto `copier.yml` deste repositório executa **estritamente** os 5 comandos a seguir, sem scripts ocultos ou conexões externas não autorizadas:
+
+| Ordem | Comando | Propósito |
+| :---: | :--- | :--- |
+| 1 | `git init -b main` | Inicializa o repositório Git local no branch padrão `main` |
+| 2 | `uv sync --all-groups` | Cria o ambiente virtual `.venv` e resolve dependências gerando `uv.lock` |
+| 3 | `git add .` | Adiciona os arquivos iniciais e o `uv.lock` ao índice do Git |
+| 4 | `uv tool run pre-commit install --install-hooks` | Instala o hook de `pre-commit` e pré-baixa os ambientes isolados |
+| 5 | `uv tool run pre-commit install --hook-type pre-push` | Registra a checagem de tipos (`pyright`) e testes (`pytest`) para o `git push` |
+
+> [!TIP]
+> **Como auditar antes de executar:** Você pode inspecionar o arquivo `copier.yml` diretamente no GitHub ou inspecionar localmente antes de aceitar. Caso prefira rodar sem a flag `--trust`, o Copier criará os arquivos sem rodar as `_tasks`, bastando executar os 5 comandos acima manualmente no terminal.
+
+---
+
+## 📊 Governança e Reprodutibilidade de Dados
+
+A arquitetura de diretórios `data/` implementa o padrão industrial de segregação por ciclo de vida e imutabilidade:
+
+```text
+data/
+├── 01_raw/          # IMUTÁVEL: Dumps brutos, snapshots de banco de dados, APIs externas. Nunca edite ou sobrescreva.
+├── 02_interim/      # TRATADO: Dados intermediários normalizados, imputados ou enriquecidos.
+├── 03_processed/    # CANÔNICO: Datasets prontos para treinamento de modelos, matrizes de features ou dashboards.
+└── 04_external/     # EXTERNO: Dicionários de dados, tabelas de CEP/IBGE, metadados de domínio público.
+```
+
+### Boas Práticas de Reprodutibilidade
+1. **Imutabilidade em `01_raw`:** Trate qualquer arquivo depositado nesta pasta como somente-leitura. Todo processamento deve gerar novos arquivos em `02_interim` ou `03_processed`.
+2. **Formato Parquet Padronizado:** Utilize arquivos `.parquet` para I/O de dados colunares. Com `pyarrow>=18.0.0` no ambiente, tanto `pandas` (`df.to_parquet()`) quanto `polars` oferecem compressão Snappy rápida e preservação rigorosa de tipos de dados.
+3. **Versionamento de Datasets:** O `.gitignore` ignora dados volumosos por padrão (mantendo apenas os `.gitkeep`). Para rastreamento de dados em equipe, recomenda-se conectar o repositório a uma ferramenta de data-versioning (como [DVC](https://dvc.org/) ou armazenamento em bucket S3/GCS com versionamento de objetos habilitado).
+
+---
+
 ## 🛡️ Qualidade de Código & CI/CD
 
 ### Pre-commit & Pre-push
@@ -244,13 +289,19 @@ docker run --rm -p 8000:8000 --name meu-projeto-app meu-projeto:v1
 Para validar e inspecionar o template antes de publicar novas alterações no Git:
 
 ```bash
-# Gerar um projeto de teste em pasta temporária usando defaults
-uvx copier copy --trust --defaults . /tmp/test-ds-project
+# Opção A: Gerar com nome de projeto explícito
+uvx copier copy --trust --defaults -d project_name="test-project" . /tmp/test-project
+cd /tmp/test-project
 
-# Verificar se o projeto gerado compila e passa nos testes
-cd /tmp/test-ds-project
+# Executar checagens de qualidade e testes
 uv run pytest
 uv run ruff check .
+uv run ruff format --check .
 uv run pyright
-uv run test-project   # Executa o CLI configurado
+uv run test-project                       # Executa o CLI do projeto
+uv tool run pre-commit run --all-files    # Valida todos os hooks
+
+# Opção B: Gerar utilizando puramente os defaults (project_name default: "meu-projeto")
+# uvx copier copy --trust --defaults . /tmp/meu-projeto
+# cd /tmp/meu-projeto && uv run meu-projeto
 ```

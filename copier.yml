@@ -1,6 +1,11 @@
 # Configurações internas do Copier
 _min_copier_version: "9.0.0"
 _answers_file: ".copier-answers.yml"
+_exclude:
+  - ".git"
+  - ".git/**"
+  - ".github/workflows/validate-template.yml"
+  - "copier.yml"
 
 # ==========================================
 # PERGUNTAS INTERATIVAS NO TERMINAL
@@ -8,13 +13,14 @@ _answers_file: ".copier-answers.yml"
 project_name:
   type: str
   help: "Nome do repositório/projeto (use hífens, ex: previsao-churn):"
-  validator: "{% if not (project_name | regex_search('^[a-z][a-z0-9\\-]+$')) %}Use apenas letras minúsculas, números e hífens.{% endif %}"
+  default: "meu-projeto"
+  validator: "{% if not (project_name | regex_search('^[a-z][a-z0-9\\-]*$')) %}Use apenas letras minúsculas, números e hífens.{% endif %}"
 
 package_name:
   type: str
   help: "Nome do pacote Python dentro de src/ (use underscores):"
   default: "{{ project_name | replace('-', '_') }}"
-  validator: "{% if not (package_name | regex_search('^[a-z][a-z0-9_]+$')) %}Nome de pacote Python inválido.{% endif %}"
+  validator: "{% if not (package_name | regex_search('^[a-z][a-z0-9_]*$')) %}Nome de pacote Python inválido.{% endif %}"
 
 description:
   type: str
