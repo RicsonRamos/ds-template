@@ -76,10 +76,12 @@ ds-template/
     ├── tests/
     │   ├── __init__.py                         # Inicialização dos testes
     │   └── test_smoke.py.jinja                 # Teste de fumaça inicial garantindo importabilidade
+    ├── .dockerignore                           # Exclusões de contexto de build Docker
     ├── .env.example                            # Variáveis de ambiente de exemplo
     ├── .gitignore                              # Gitignore com exclusões específicas de Data Science
     ├── .pre-commit-config.yaml                 # Configuração de hooks git (pre-commit e pre-push)
     ├── .python-version.jinja                   # Posição da versão do Python selecionada
+    ├── Dockerfile.jinja                        # Dockerfile multi-stage de produção otimizado com UV
     ├── pyproject.toml.jinja                    # Manifesto PEP 621 com grupos dev e notebooks
     ├── README.md.jinja                         # README customizado do projeto criado
     └── {{ _copier_conf.answers_file }}.jinja   # Arquivo de estado para permitir copier update
@@ -210,6 +212,27 @@ O arquivo gerado em `.github/workflows/ci.yml` automatiza a validação em pull 
 5. Verificação de formatação (`uv run ruff format --check .`).
 6. Checagem de tipos (`uv run pyright`).
 7. Execução dos testes (`uv run pytest`).
+
+---
+
+## 🐳 Contêinerização de Produção com Docker & UV
+
+O template gera automaticamente um `Dockerfile` multi-stage altamente otimizado e um arquivo `.dockerignore` dedicado:
+
+1. **Separação em Múltiplos Estágios (`Multi-Stage Build`):**
+   - **Estágio 1 (Builder):** Baixa o binário do `uv` direto da imagem oficial (`ghcr.io/astral-sh/uv:latest`), copia manifestos e sincroniza o `.venv` de produção usando cache de montagem (`--mount=type=cache,target=/root/.cache/uv`).
+   - **Estágio 2 (Runtime Final):** Imagem limpa (`python:{{ python_version }}-slim-bookworm`) sem ferramentas de build ou binários do uv, apenas o `.venv` final e código compilado.
+2. **Cache Agressivo de Camadas:** A separação de cópia de `pyproject.toml`/`uv.lock` antes do código-fonte (`src/`) impede que alterações em scripts ou modelos invalidem o cache de download de dependências.
+3. **Segurança (Princípio do Menor Privilégio):** O container executa sob o usuário não-root `appuser` (UID 1001).
+4. **Execução Padronizada:** O comando de inicialização executa o CLI do projeto (`{{ project_name }}`) e traz documentado o comando para APIs web (ex: FastAPI/Uvicorn).
+
+```bash
+# Construir a imagem Docker do projeto
+docker build -t meu-projeto:v1 .
+
+# Executar o container
+docker run --rm -p 8000:8000 --name meu-projeto-app meu-projeto:v1
+```
 
 ---
 

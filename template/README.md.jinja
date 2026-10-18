@@ -41,10 +41,12 @@
 │   ├── __init__.py
 │   └── test_smoke.py                  # Initial smoke test
 ├── .copier-answers.yml                # Template configuration (enables 'copier update')
+├── .dockerignore                      # Exclusões de contexto de build Docker
 ├── .env.example                       # Example environment variables
 ├── .gitignore                         # Data Science gitignore
 ├── .pre-commit-config.yaml            # Git hooks configuration (pre-commit & pre-push)
 ├── .python-version                    # Pinned Python version ({{ python_version }})
+├── Dockerfile                         # Multi-stage production Dockerfile optimized with UV
 ├── pyproject.toml                     # Project dependencies and tool configurations
 └── README.md
 ```
@@ -151,6 +153,20 @@ uv tool run pre-commit run --all-files
 
 # Pre-push stage hooks
 uv tool run pre-commit run --hook-stage pre-push --all-files
+```
+
+---
+
+## 🐳 Docker Deployment
+
+The project includes an optimized multi-stage `Dockerfile` leveraging UV layer caching and non-root runtime:
+
+```bash
+# Build the Docker image
+docker build -t {{ project_name }}:v1 .
+
+# Run the container
+docker run --rm -p 8000:8000 --name {{ project_name }}-app {{ project_name }}:v1
 ```
 
 ---
