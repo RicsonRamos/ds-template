@@ -142,7 +142,7 @@ uv run pyright
 ## 🪝 Git Hooks (Pre-commit & Pre-push)
 
 Pre-commit hooks are configured via `.pre-commit-config.yaml`:
-- **Pre-commit:** Runs hygiene checks (whitespace, YAML/TOML syntax, large files) and Ruff lint/format.
+- **Pre-commit:** Runs hygiene checks (whitespace, YAML/TOML syntax, large files), Jupyter notebook visual output cleaning (`nbstripout`), and Ruff lint/format.
 - **Pre-push:** Runs Pyright type checking and pytest tests.
 
 To manually trigger the hooks on all files:

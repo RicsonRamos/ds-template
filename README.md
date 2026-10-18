@@ -30,10 +30,10 @@ Template de arquitetura moderna, modular e reproduzível para projetos de **Ciê
 ## 🏛️ Visão Geral & Decisões Arquiteturais
 
 ### 1. Copier vs. Cookiecutter: Por que Copier?
-Diferente do Cookiecutter (que opera como gerador estático unidirecional), o **Copier** mantém o estado da geração gravado no arquivo de respostas (`.copier-answers.yml`). Isso confere um diferencial crítico:
-- **Evolução Contínua (`copier update`):** Quando regras de linting, scripts de CI ou dependências base são aprimorados no template, projetos antigos podem receber as atualizações via algoritmo de *three-way merge* sem sobrescrever código de negócio ou análises já desenvolvidas.
+Diferente do Cookiecutter (que opera como gerador estático unidirecional), o **Copier** mantém o estado da geração gravado no arquivo de respostas (`.copier-answers.yml`). Isso confere diferenciais críticos:
+- **Evolução Contínua (`copier update`):** Quando regras de linting, scripts de CI, hooks de pre-commit ou dependências base são aprimorados no template, projetos antigos podem receber as atualizações via algoritmo de *three-way merge* sem sobrescrever código de negócio ou análises já desenvolvidas.
 - **Automação Pós-Geração (`_tasks`):** Execução determinística de comandos do sistema imediatamente após o scaffold (`git init`, `uv sync`, instalação de hooks do Git).
-- **Subdiretório Isolado (`_subdirectory: template`):** Separa a definição do template (`copier.yml`) dos arquivos copiados, mantendo o repositório gerador limpo e evitando vazamento de metadados do gerador para os projetos finais.
+- **Estrutura Direta na Raiz (`_exclude`):** Todos os arquivos de template residem na raiz do repositório, com exclusão declarativa em `copier.yml` para metadados internos (`_exclude: ["copier.yml", "README.md", ".git"]`).
 
 ### 2. uv: Ecossistema Python Unificado em Rust
 - Gerenciamento ultrarrápido de dependências e ambientes virtuais (`.venv`).
@@ -42,6 +42,8 @@ Diferente do Cookiecutter (que opera como gerador estático unidirecional), o **
 
 ### 3. Stack de Engenharia de Software Aplicada a Dados
 - **Build Backend:** `hatchling` (conforme PEP 517/PEP 621), com mapeamento explícito do pacote (`tool.hatch.build.targets.wheel.packages = ["src/{{ package_name }}"]`).
+- **I/O Moderno com Parquet:** Suporte nativo a leitura/escrita de arquivos `.parquet` com `polars` e `pandas` (via `pyarrow>=18.0.0`).
+- **Limpeza de Notebooks (`nbstripout`):** Higienização automática de saídas visuais, contagens de execução e dados sensíveis em notebooks `.ipynb` antes de cada commit.
 - **Linter & Formatter:** `ruff` com 18 categorias de regras ativadas (incluindo `pandas-vet`, `flake8-bugbear`, `numpy-specific`, `security`, `import-sorting`), formatador determinístico e suporte nativo a Jupyter Notebooks (`*.ipynb`).
 - **Tipagem Estática:** `pyright` e `ty` configurados em modo `standard`, garantindo rigor em pipelines e classes sem sobrecarregar a exploração em notebooks.
 - **Testes:** `pytest` com `pytest-xdist`, configurado com `testpaths = ["tests"]` e `pythonpath = ["src"]`.
@@ -52,39 +54,38 @@ Diferente do Cookiecutter (que opera como gerador estático unidirecional), o **
 
 ```text
 ds-template/
+├── .dockerignore                               # Exclusões de contexto de build Docker
+├── .env.example                                # Variáveis de ambiente de exemplo
+├── .github/
+│   └── workflows/
+│       └── ci.yml.jinja                        # Workflow GitHub Actions com setup-uv e checagens completas
+├── .gitignore                                  # Gitignore com exclusões específicas de Data Science
+├── .pre-commit-config.yaml                     # Configuração de hooks git (nbstripout, ruff, pyright)
+├── .python-version.jinja                       # Posição da versão do Python selecionada
+├── .vscode/
+│   └── settings.json                           # Configurações do VS Code (Ruff format-on-save, Pyright)
+├── Dockerfile.jinja                            # Dockerfile multi-stage de produção otimizado com UV
+├── README.md                                   # Documentação técnica do template gerador
+├── README.md.jinja                             # README customizado do projeto criado
 ├── copier.yml                                  # Manifesto do template (prompts, validações e _tasks)
-├── README.md                                   # Documentação técnica do template
-└── template/                                   # Raiz do projeto de Ciência de Dados a ser gerado
-    ├── .github/
-    │   └── workflows/
-    │       └── ci.yml.jinja                    # Workflow GitHub Actions com setup-uv e checagens completas
-    ├── .vscode/
-    │   └── settings.json                       # Configurações do VS Code (Ruff format-on-save, Pyright)
-    ├── data/
-    │   ├── 01_raw/.gitkeep                     # Dados brutos e imutáveis
-    │   ├── 02_interim/.gitkeep                 # Dados em estágios intermediários de limpeza
-    │   ├── 03_processed/.gitkeep               # Dados canônicos prontos para modelagem/consumo
-    │   └── 04_external/.gitkeep                # Dados de terceiros ou fontes externas
-    ├── models/.gitkeep                         # Modelos serializados (.joblib, .pt, .onnx)
-    ├── notebooks/.gitkeep                      # Cadernos interativos de exploração
-    ├── reports/
-    │   └── figures/.gitkeep                    # Figuras, gráficos e relatórios visuais
-    ├── src/
-    │   └── {{ package_name }}/                 # Pacote Python com nomenclatura dinâmica
-    │       ├── __init__.py                     # Inicialização do pacote
-    │       └── config.py                       # Caminhos de filesystem centralizados com pathlib
-    ├── tests/
-    │   ├── __init__.py                         # Inicialização dos testes
-    │   └── test_smoke.py.jinja                 # Teste de fumaça inicial garantindo importabilidade
-    ├── .dockerignore                           # Exclusões de contexto de build Docker
-    ├── .env.example                            # Variáveis de ambiente de exemplo
-    ├── .gitignore                              # Gitignore com exclusões específicas de Data Science
-    ├── .pre-commit-config.yaml                 # Configuração de hooks git (pre-commit e pre-push)
-    ├── .python-version.jinja                   # Posição da versão do Python selecionada
-    ├── Dockerfile.jinja                        # Dockerfile multi-stage de produção otimizado com UV
-    ├── pyproject.toml.jinja                    # Manifesto PEP 621 com grupos dev e notebooks
-    ├── README.md.jinja                         # README customizado do projeto criado
-    └── {{ _copier_conf.answers_file }}.jinja   # Arquivo de estado para permitir copier update
+├── data/
+│   ├── 01_raw/.gitkeep                         # Dados brutos e imutáveis
+│   ├── 02_interim/.gitkeep                     # Dados em estágios intermediários de limpeza
+│   ├── 03_processed/.gitkeep                   # Dados canônicos prontos para modelagem/consumo
+│   └── 04_external/.gitkeep                    # Dados de terceiros ou fontes externas
+├── models/.gitkeep                             # Modelos serializados (.joblib, .pt, .onnx)
+├── notebooks/.gitkeep                          # Cadernos interativos de exploração
+├── pyproject.toml.jinja                        # Manifesto PEP 621 com dependências (pandas, polars, pyarrow)
+├── reports/
+│   └── figures/.gitkeep                        # Figuras, gráficos e relatórios visuais
+├── src/
+│   └── {{ package_name }}/                     # Pacote Python com nomenclatura dinâmica
+│       ├── __init__.py                         # Inicialização do pacote
+│       └── config.py                           # Caminhos de filesystem centralizados com pathlib
+├── tests/
+│   ├── __init__.py                             # Inicialização dos testes
+│   └── test_smoke.py.jinja                     # Teste de fumaça inicial garantindo importabilidade
+└── {{ _copier_conf.answers_file }}.jinja       # Arquivo de estado para permitir copier update
 ```
 
 ---
@@ -192,8 +193,10 @@ A configuração em `.pre-commit-config.yaml` divide as checagens em dois estág
   - Remoção de espaços em branco no final de linhas (`trailing-whitespace`).
   - Ajuste de quebras de linha final de arquivo (`end-of-file-fixer`).
   - Validação sintática de arquivos YAML e TOML (`check-yaml`, `check-toml`).
-  - Bloqueio de arquivos maiores que 50MB (`check-added-large-files`).
+  - Bloqueio de arquivos maiores que 1MB (`check-added-large-files`).
   - Detecção de marcadores de conflito do Git (`check-merge-conflict`).
+  - Prevenção de conflito de caixa em sistemas de arquivos (`check-case-conflict`).
+  - Limpeza automática de saídas visuais e dados sensíveis de notebooks Jupyter (`nbstripout`).
   - Linting e correção automática via `ruff`.
   - Formatação padronizada via `ruff-format`.
 
