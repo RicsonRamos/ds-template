@@ -43,7 +43,7 @@ jobs:
 
       - name: Test 1 - Scaffold with pure defaults
         run: |
-          uv tool run copier copy --trust --defaults . /tmp/test-project-default
+          uv tool run copier copy --trust --defaults "$GITHUB_WORKSPACE" /tmp/test-project-default
           test -d /tmp/test-project-default/.git
           test -f /tmp/test-project-default/pyproject.toml
           test -f /tmp/test-project-default/uv.lock
@@ -72,10 +72,12 @@ jobs:
           assert len(df_read) == 2
           print('Parquet I/O verified successfully.')
           "
+          rm -f data/02_interim/test.parquet
 
       - name: Test 2 - Verify Copier Update Lifecycle
         working-directory: /tmp/test-project-default
         run: |
+          git commit -m "feat: initial project commit"
           uv tool run copier update --trust --defaults
 
       - name: Test 3 - Parameterized Scaffold (Python 3.13, Custom Names)
@@ -84,7 +86,7 @@ jobs:
             -d project_name="previsao-churn" \
             -d package_name="previsao_churn" \
             -d python_version="3.13" \
-            . /tmp/test-project-custom
+            "$GITHUB_WORKSPACE" /tmp/test-project-custom
           cd /tmp/test-project-custom
           uv run pytest
           uv run previsao-churn
