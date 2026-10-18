@@ -1,0 +1,51 @@
+# Configurações internas do Copier
+_min_copier_version: "9.0.0"
+_subdirectory: "template"
+_answers_file: ".copier-answers.yml"
+
+# ==========================================
+# PERGUNTAS INTERATIVAS NO TERMINAL
+# ==========================================
+project_name:
+  type: str
+  help: "Nome do repositório/projeto (use hífens, ex: previsao-churn):"
+  validator: "{% if not (project_name | regex_search('^[a-z][a-z0-9\\-]+$')) %}Use apenas letras minúsculas, números e hífens.{% endif %}"
+
+package_name:
+  type: str
+  help: "Nome do pacote Python dentro de src/ (use underscores):"
+  default: "{{ project_name | replace('-', '_') }}"
+  validator: "{% if not (package_name | regex_search('^[a-z][a-z0-9_]+$')) %}Nome de pacote Python inválido.{% endif %}"
+
+description:
+  type: str
+  help: "Descrição curta do projeto:"
+  default: "Projeto de Ciência de Dados e Machine Learning"
+
+author_name:
+  type: str
+  help: "Seu nome:"
+  default: "Seu Nome"
+
+author_email:
+  type: str
+  help: "Seu e-mail:"
+  default: "seu@email.com"
+
+python_version:
+  type: str
+  help: "Versão do Python:"
+  default: "3.12"
+  choices:
+    - "3.12"
+    - "3.13"
+
+# ==========================================
+# AUTOMAÇÃO PÓS-GERAÇÃO (Roda sozinho!)
+# ==========================================
+_tasks:
+  - "git init -b main"
+  - "uv sync --all-groups"
+  - "git add ."
+  - "uv tool run pre-commit install --install-hooks"
+  - "uv tool run pre-commit install --hook-type pre-push"

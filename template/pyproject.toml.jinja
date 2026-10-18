@@ -1,0 +1,93 @@
+[project]
+name = "{{ project_name }}"
+version = "0.1.0"
+description = "{{ description }}"
+readme = "README.md"
+license = "MIT"
+authors = [{ name = "{{ author_name }}", email = "{{ author_email }}" }]
+requires-python = ">={{ python_version }}"
+dependencies = [
+    "python-dotenv>=1.1.0",
+    "numpy>=2.1.0",
+    "pandas>=2.2.0",
+    "polars>=1.15.0",
+    "scikit-learn>=1.5.0",
+    "matplotlib>=3.9.0",
+]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.9.0",
+    "pyright>=1.1.390",
+    "ty>=0.0.80",
+    "pytest>=8.3.0",
+    "pytest-xdist>=3.6.0",
+    "pandas-stubs>=2.2.0",
+]
+notebooks = [
+    "ipykernel>=6.29.0",
+    "jupyterlab>=4.3.0",
+    "seaborn>=0.13.0",
+]
+
+[project.scripts]
+{{ project_name }} = "{{ package_name }}.config:info"
+
+[tool.ruff]
+line-length = 88
+target-version = "py{{ python_version | replace('.', '') }}"
+indent-width = 4
+extend-include = ["*.ipynb"]
+
+[tool.ruff.lint]
+select = [
+    "B", "C4", "E", "F", "I", "ICN", "N", "NPY",
+    "PD", "PERF", "PT", "RET", "RUF", "S", "SIM",
+    "T10", "TRY", "UP", "W",
+]
+ignore = [
+    "T201", "COM812", "ISC001", "N803", "N806",
+    "S301", "S311",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = ["S101", "SLF001", "FBT001"]
+"notebooks/**/*.ipynb" = ["E402", "B018", "F401"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "lf"
+docstring-code-format = true
+
+[tool.ruff.lint.isort]
+known-first-party = ["{{ package_name }}"]
+
+[tool.pyright]
+typeCheckingMode = "standard"
+pythonVersion = "{{ python_version }}"
+include = ["src", "tests"]
+exclude = ["notebooks"]
+venv = ".venv"
+venvPath = "."
+executionEnvironments = [{ root = "src" }]
+reportMissingTypeStubs = false
+
+[tool.ty.environment]
+python-version = "{{ python_version }}"
+
+[tool.ty.src]
+include = ["src", "tests"]
+exclude = ["notebooks/**"]
+
+[tool.pytest.ini_options]
+addopts = "-ra --color=yes --tb=short --strict-markers"
+pythonpath = ["src"]
+testpaths = ["tests"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/{{ package_name }}"]
