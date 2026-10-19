@@ -7,13 +7,16 @@
 [![Type Checker: Pyright](https://img.shields.io/badge/type%20checker-pyright-green.svg)](https://microsoft.github.io/pyright/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-Template de arquitetura moderna, modular e reproduzível para projetos de **Ciência de Dados e Machine Learning**, baseado em **[Copier](https://copier.readthedocs.io/)**, **[uv](https://docs.astral.sh/uv/)**, **Ruff**, **Pyright** e **Pytest**.
+Template de arquitetura modular, escalável e reproduzível para projetos de **Ciência de Dados, Machine Learning e MLOps**, baseado em **[Copier](https://copier.readthedocs.io/)**, **[uv](https://docs.astral.sh/uv/)**, **Ruff**, **Pyright** e **Pytest**.
+
+Oferece suporte nativo a **3 Níveis de Complexidade Arquitetural (`project_level`)**, adaptando automaticamente pastas, scripts, endpoints de API, manifesto de dependências e contêinerização ao escopo do seu projeto.
 
 ---
 
 ## 📑 Sumário
 
 - [Visão Geral & Decisões Arquiteturais](#-visão-geral--decisões-arquiteturais)
+- [Arquitetura em 3 Níveis de Complexidade](#-arquitetura-em-3-níveis-de-complexidade)
 - [Estrutura do Repositório do Template](#-estrutura-do-repositório-do-template)
 - [Variáveis e Ciclo de Vida do Copier](#-variáveis-e-ciclo-de-vida-do-copier)
 - [Estrutura dos Projetos Gerados](#-estrutura-dos-projetos-gerados)
@@ -37,7 +40,7 @@ Template de arquitetura moderna, modular e reproduzível para projetos de **Ciê
 Diferente do Cookiecutter (que opera como gerador estático unidirecional), o **Copier** mantém o estado da geração gravado no arquivo de respostas (`.copier-answers.yml`). Isso confere diferenciais críticos:
 - **Evolução Contínua (`copier update`):** Quando regras de linting, scripts de CI, hooks de pre-commit ou dependências base são aprimorados no template, projetos antigos podem receber as atualizações via algoritmo de *three-way merge* sem sobrescrever código de negócio ou análises já desenvolvidas.
 - **Automação Pós-Geração (`_tasks`):** Execução determinística de comandos do sistema imediatamente após o scaffold (`git init`, `uv sync`, instalação de hooks do Git).
-- **Estrutura Direta na Raiz (`_exclude`):** Todos os arquivos de template residem na raiz do repositório, com exclusão declarativa em `copier.yml` para metadados internos (`_exclude: [".git", ".git/**", ".github/workflows/validate-template.yml", "copier.yml"]`).
+- **Estrutura Direta na Raiz (`_exclude`):** Todos os arquivos de template residem na raiz do repositório, com exclusão declarativa em `copier.yml` para metadados internos e renderização condicional baseada no nível escolhido.
 
 ### 2. uv: Ecossistema Python Unificado em Rust
 - Gerenciamento ultrarrápido de dependências e ambientes virtuais (`.venv`).
@@ -54,42 +57,75 @@ Diferente do Cookiecutter (que opera como gerador estático unidirecional), o **
 
 ---
 
+## 🎚️ Arquitetura em 3 Níveis de Complexidade
+
+Nem todo projeto de dados requer uma API em contêiner ou modelos serializados. Por isso, o template oferece o seletor `project_level`:
+
+| Recurso / Componente | Nível 1: Análise & EDA | Nível 2: DS & ML (Padrão) | Nível 3: MLOps & Produção |
+| :--- | :---: | :---: | :---: |
+| **Foco Principal** | Análise exploratória, dashboards, relatórios | Modelagem preditiva tabular, engenharia de features | Microsserviços de inferência, pipelines, contêineres |
+| `data/01_raw`, `data/03_processed` | Sim | Sim | Sim |
+| `data/02_interim`, `data/04_external` | Não | Sim | Sim |
+| Diretório `models/` | Não | Sim | Sim |
+| `notebooks/` & `reports/figures/` | Sim | Sim | Sim |
+| `src/<pkg>/config.py` (caminhos pathlib) | Sim | Sim | Sim |
+| `src/<pkg>/features.py` (Transformers) | Não | Sim | Sim |
+| `src/<pkg>/train.py` (Pipeline de treino) | Não | Sim | Sim |
+| `src/<pkg>/predict.py` (Inferência em lote) | Não | Sim | Sim |
+| `src/<pkg>/api/` (FastAPI + Pydantic) | Não | Não | Sim |
+| `Dockerfile` & `.dockerignore` | Não | Não | Sim |
+| Testes unitários do modelo (`test_ml.py`) | Não | Sim | Sim |
+| Testes de integração da API (`test_api.py`) | Não | Não | Sim |
+| Bibliotecas: `scikit-learn`, `joblib` | Não | Sim | Sim |
+| Bibliotecas: `fastapi`, `uvicorn`, `pydantic`, `mlflow` | Não | Não | Sim |
+
+---
+
 ## 📂 Estrutura do Repositório do Template
 
 ```text
 ds-template/
-├── .dockerignore                               # Exclusões de contexto de build Docker
+├── .dockerignore                               # Exclusões de build Docker (Nível 3)
 ├── .env.example                                # Variáveis de ambiente de exemplo
 ├── .github/
 │   └── workflows/
-│       ├── ci.yml.jinja                        # CI dos projetos gerados (setup-uv, checagens completas)
-│       └── validate-template.yml               # CI do template gerador (testa scaffold, CI e Docker)
+│       ├── ci.yml.jinja                        # CI dos projetos gerados (setup-uv, checagens, Docker)
+│       └── validate-template.yml               # CI do template gerador (testa níveis 1, 2 e 3 + Docker)
 ├── .gitignore                                  # Gitignore com exclusões específicas de Data Science
 ├── .pre-commit-config.yaml                     # Configuração de hooks git (nbstripout, ruff, pyright)
-├── .python-version.jinja                       # Posição da versão do Python selecionada
+├── .python-version.jinja                       # Versão do Python selecionada
 ├── .vscode/
 │   └── settings.json                           # Configurações do VS Code (Ruff format-on-save, Pyright)
-├── Dockerfile.jinja                            # Dockerfile multi-stage de produção otimizado com UV
+├── Dockerfile.jinja                            # Dockerfile multi-stage de produção otimizado com UV (Nível 3)
 ├── README.md                                   # Documentação técnica do template gerador
-├── README.md.jinja                             # README customizado do projeto criado
-├── copier.yml                                  # Manifesto do template (prompts, validações e _tasks)
+├── README.md.jinja                             # README adaptativo do projeto gerado
+├── copier.yml                                  # Manifesto do template (prompts, validações, excludes e _tasks)
 ├── data/
 │   ├── 01_raw/.gitkeep                         # Dados brutos e imutáveis
-│   ├── 02_interim/.gitkeep                     # Dados em estágios intermediários de limpeza
+│   ├── 02_interim/.gitkeep                     # Dados em estágios intermediários (Níveis 2 e 3)
 │   ├── 03_processed/.gitkeep                   # Dados canônicos prontos para modelagem/consumo
-│   └── 04_external/.gitkeep                    # Dados de terceiros ou fontes externas
-├── models/.gitkeep                             # Modelos serializados (.joblib, .pt, .onnx)
+│   └── 04_external/.gitkeep                    # Dados de terceiros ou fontes externas (Níveis 2 e 3)
+├── models/.gitkeep                             # Modelos serializados (.joblib, .pt, .onnx) (Níveis 2 e 3)
 ├── notebooks/.gitkeep                          # Cadernos interativos de exploração
-├── pyproject.toml.jinja                        # Manifesto PEP 621 com dependências (pandas, polars, pyarrow)
+├── pyproject.toml.jinja                        # Manifesto PEP 621 com dependências dinâmicas por nível
 ├── reports/
 │   └── figures/.gitkeep                        # Figuras, gráficos e relatórios visuais
 ├── src/
 │   └── {{ package_name }}/                     # Pacote Python com nomenclatura dinâmica
 │       ├── __init__.py                         # Inicialização do pacote
-│       └── config.py                           # Caminhos de filesystem centralizados com pathlib
+│       ├── config.py                           # Caminhos de filesystem centralizados com pathlib
+│       ├── features.py                         # Pipelines de pré-processamento (Níveis 2 e 3)
+│       ├── train.py.jinja                      # Script de treino baseline e serialização (Níveis 2 e 3)
+│       ├── predict.py.jinja                    # Pipeline de inferência em lote (Níveis 2 e 3)
+│       └── api/                                # Microsserviço FastAPI (Nível 3)
+│           ├── __init__.py
+│           ├── app.py.jinja                    # Endpoints /health e /predict com lifespan
+│           └── schemas.py                      # Modelos Pydantic para I/O estrito
 ├── tests/
 │   ├── __init__.py                             # Inicialização dos testes
-│   └── test_smoke.py.jinja                     # Teste de fumaça inicial garantindo importabilidade
+│   ├── test_smoke.py.jinja                     # Teste de fumaça inicial
+│   ├── test_ml.py.jinja                        # Testes das rotinas de ML (Níveis 2 e 3)
+│   └── test_api.py.jinja                       # Testes de integração da API FastAPI (Nível 3)
 └── {{ _copier_conf.answers_file }}.jinja       # Arquivo de estado para permitir copier update
 ```
 
@@ -103,6 +139,7 @@ O arquivo `copier.yml` solicita as seguintes configurações no momento da cria�
 | :--- | :--- | :--- | :--- |
 | `project_name` | `str` | Nome do repositório/projeto | Default: `"meu-projeto"`. Regex: `^[a-z][a-z0-9\-]*$` (letras minúsculas, números e hífens) |
 | `package_name` | `str` | Nome do módulo Python em `src/` | Default: `project_name` com `-` substituído por `_`. Regex: `^[a-z][a-z0-9_]*$` |
+| `project_level`| `str` | Nível de complexidade do projeto | Opções: `1` (Análise/EDA), `2` (DS & ML Tabular - Padrão), `3` (MLOps & Produção) |
 | `description` | `str` | Descrição sucinta do projeto | Default: `"Projeto de Ciência de Dados e Machine Learning"` |
 | `author_name` | `str` | Nome do autor/mantenedor | Default: `"Seu Nome"` |
 | `author_email`| `str` | E-mail do autor | Default: `"seu@email.com"` |
@@ -118,8 +155,6 @@ git add .
 uv tool run pre-commit install --install-hooks
 uv tool run pre-commit install --hook-type pre-push
 ```
-
-Essas tarefas inicializam o repositório Git no branch `main`, sincronizam todas as dependências gerando o `uv.lock`, colocam os arquivos sob monitoramento do Git e instalam os hooks de `pre-commit` e `pre-push`.
 
 ---
 
@@ -147,7 +182,7 @@ Não é necessário instalar o Copier globalmente. O comando `uvx` baixa e execu
 
 #### A partir de um repositório GitHub publicado:
 ```bash
-uvx copier copy --trust gh:SEU-USUARIO/ds-template ./meu-projeto
+uvx copier copy --trust gh:RicsonRamos/ds-template ./meu-projeto
 ```
 
 #### A partir de um diretório local do template:
@@ -162,23 +197,15 @@ uvx copier copy --trust /caminho/para/ds-template ./meu-projeto
 O Copier utiliza as **tags do Git** para identificar versões estáveis do template. Ao criar ou atualizar o template, publique-o com versionamento semântico:
 
 ```bash
-# Dentro do diretório ds-template
-git init -b main
 git add .
-git commit -m "feat: initial Data Science template with uv, Ruff, Pyright and Copier"
-git tag v1.0.0
-
-# Conectar ao seu repositório remoto no GitHub
-git remote add origin https://github.com/SEU-USUARIO/ds-template.git
-git push -u origin main --tags
+git commit -m "feat: implement 3-level tiering architecture (EDA, DS/ML, MLOps)"
+git tag v2.0.0
+git push origin main --tags
 ```
 
 ### 3. Atualizando Projetos Existentes (`copier update`)
 
 Se você adicionar uma nova biblioteca às dependências padrão, atualizar as regras do Ruff ou aprimorar o GitHub Actions no repositório `ds-template`:
-
-1. Faça o commit e publique uma nova tag no template (ex: `git tag v1.1.0 && git push --tags`).
-2. Entre em qualquer projeto de Ciência de Dados criado anteriormente e execute:
 
 ```bash
 uvx copier update --trust
@@ -194,7 +221,7 @@ Por segurança, o Copier requer a flag `--trust` para executar qualquer template
 
 ### Comandos Executados na Inicialização
 
-O manifesto `copier.yml` deste repositório executa **estritamente** os 5 comandos a seguir, sem scripts ocultos ou conexões externas não autorizadas:
+O manifesto `copier.yml` deste repositório executa **estritamente** os 5 comandos a seguir:
 
 | Ordem | Comando | Propósito |
 | :---: | :--- | :--- |
@@ -203,9 +230,6 @@ O manifesto `copier.yml` deste repositório executa **estritamente** os 5 comand
 | 3 | `git add .` | Adiciona os arquivos iniciais e o `uv.lock` ao índice do Git |
 | 4 | `uv tool run pre-commit install --install-hooks` | Instala o hook de `pre-commit` e pré-baixa os ambientes isolados |
 | 5 | `uv tool run pre-commit install --hook-type pre-push` | Registra a checagem de tipos (`pyright`) e testes (`pytest`) para o `git push` |
-
-> [!TIP]
-> **Como auditar antes de executar:** Você pode inspecionar o arquivo `copier.yml` diretamente no GitHub ou inspecionar localmente antes de aceitar. Caso prefira rodar sem a flag `--trust`, o Copier criará os arquivos sem rodar as `_tasks`, bastando executar os 5 comandos acima manualmente no terminal.
 
 ---
 
@@ -260,19 +284,20 @@ O arquivo gerado em `.github/workflows/ci.yml` automatiza a validação em pull 
 5. Verificação de formatação (`uv run ruff format --check .`).
 6. Checagem de tipos (`uv run pyright`).
 7. Execução dos testes (`uv run pytest`).
+8. Validação de build da imagem Docker (quando `project_level == '3'`).
 
 ---
 
 ## 🐳 Contêinerização de Produção com Docker & UV
 
-O template gera automaticamente um `Dockerfile` multi-stage altamente otimizado e um arquivo `.dockerignore` dedicado:
+Para projetos de Nível 3 (MLOps & Produção), o template gera automaticamente um `Dockerfile` multi-stage altamente otimizado e um arquivo `.dockerignore` dedicado:
 
 1. **Separação em Múltiplos Estágios (`Multi-Stage Build`):**
    - **Estágio 1 (Builder):** Baixa o binário do `uv` direto da imagem oficial (`ghcr.io/astral-sh/uv:latest`), copia manifestos e sincroniza o `.venv` de produção usando cache de montagem (`--mount=type=cache,target=/root/.cache/uv`).
    - **Estágio 2 (Runtime Final):** Imagem limpa (`python:{{ python_version }}-slim-bookworm`) sem ferramentas de build ou binários do uv, apenas o `.venv` final e código compilado.
 2. **Cache Agressivo de Camadas:** A separação de cópia de `pyproject.toml`/`uv.lock` antes do código-fonte (`src/`) impede que alterações em scripts ou modelos invalidem o cache de download de dependências.
 3. **Segurança (Princípio do Menor Privilégio):** O container executa sob o usuário não-root `appuser` (UID 1001).
-4. **Execução Padronizada:** O comando de inicialização executa o CLI do projeto (`{{ project_name }}`) e traz documentado o comando para APIs web (ex: FastAPI/Uvicorn).
+4. **Execução Padronizada:** O comando de inicialização executa a API FastAPI pronta para tráfego via Uvicorn na porta 8000.
 
 ```bash
 # Construir a imagem Docker do projeto
@@ -289,19 +314,22 @@ docker run --rm -p 8000:8000 --name meu-projeto-app meu-projeto:v1
 Para validar e inspecionar o template antes de publicar novas alterações no Git:
 
 ```bash
-# Opção A: Gerar com nome de projeto explícito
-uvx copier copy --trust --defaults -d project_name="test-project" . /tmp/test-project
-cd /tmp/test-project
-
-# Executar checagens de qualidade e testes
+# Nível 2 (Padrão: DS & ML Clássico)
+uvx copier copy --trust --defaults -d project_level="2" . /tmp/test-project-lvl2
+cd /tmp/test-project-lvl2
 uv run pytest
 uv run ruff check .
-uv run ruff format --check .
 uv run pyright
-uv run test-project                       # Executa o CLI do projeto
-uv tool run pre-commit run --all-files    # Valida todos os hooks
+uv run meu-projeto
 
-# Opção B: Gerar utilizando puramente os defaults (project_name default: "meu-projeto")
-# uvx copier copy --trust --defaults . /tmp/meu-projeto
-# cd /tmp/meu-projeto && uv run meu-projeto
+# Nível 1 (Análise & EDA)
+uvx copier copy --trust --defaults -d project_level="1" . /tmp/test-project-lvl1
+cd /tmp/test-project-lvl1
+uv run pytest
+
+# Nível 3 (MLOps & Produção com Docker)
+uvx copier copy --trust --defaults -d project_level="3" . /tmp/test-project-lvl3
+cd /tmp/test-project-lvl3
+uv run pytest
+docker build -t test-mlops:ci .
 ```

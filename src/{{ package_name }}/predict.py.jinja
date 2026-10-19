@@ -1,0 +1,29 @@
+"""Batch inference helpers."""
+
+from pathlib import Path
+from typing import Any
+
+import joblib
+import numpy as np
+
+from {{ package_name }}.config import MODELS_DIR
+
+
+def load_model(model_path: Path | None = None) -> Any:
+    """Load serialized model artifact from disk."""
+    path = model_path or (MODELS_DIR / "model.joblib")
+    if not path.exists():
+        msg = f"Model artifact not found at {path}"
+        raise FileNotFoundError(msg)
+    return joblib.load(path)
+
+
+def predict(
+    features: list[list[float]] | np.ndarray,
+    model_path: Path | None = None,
+) -> list[int]:
+    """Run batch inference using persisted model."""
+    model = load_model(model_path)
+    x = np.asarray(features)
+    preds = model.predict(x)
+    return [int(p) for p in preds]

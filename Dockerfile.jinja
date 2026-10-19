@@ -21,17 +21,14 @@ WORKDIR /app
 COPY pyproject.toml uv.lock ./
 
 # 4. Sincroniza apenas as dependências de produção (sem instalar o próprio projeto ainda)
-# Utiliza cache de montagem do Docker para reaproveitar downloads entre builds locais/CI
-RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --frozen --no-dev --no-install-project
+RUN uv sync --frozen --no-dev --no-install-project
 
 # 5. Copia o código-fonte da aplicação e README necessário para o build
 COPY src /app/src
 COPY README.md /app/README.md
 
 # 6. Sincroniza o projeto final instalado em modo produção dentro do .venv
-RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --frozen --no-dev
+RUN uv sync --frozen --no-dev
 
 # ==============================================================================
 # ESTÁGIO 2: Final Runtime (Imagem Mínima e Segura de Produção)
@@ -55,10 +52,8 @@ ENV PATH="/app/.venv/bin:$PATH" \
 # 4. Alterna para o usuário não-root
 USER appuser
 
-# 5. Expõe a porta padrão do serviço (caso exponha API ou dashboard)
+# 5. Expõe a porta padrão da API FastAPI
 EXPOSE 8000
 
-# 6. Comando padrão de inicialização (executa o CLI do projeto)
-# Caso adicione uma API web (ex: FastAPI/Uvicorn), substitua por:
-# CMD ["uvicorn", "{{ package_name }}.main:app", "--host", "0.0.0.0", "--port", "8000"]
-CMD ["{{ project_name }}"]
+# 6. Comando padrão de inicialização (executa a API FastAPI via Uvicorn)
+CMD ["uvicorn", "{{ package_name }}.api.app:app", "--host", "0.0.0.0", "--port", "8000"]

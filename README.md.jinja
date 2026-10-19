@@ -3,6 +3,7 @@
 [![Python Version](https://img.shields.io/badge/python-{{ python_version }}-blue.svg)](https://www.python.org/)
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 [![Type Checker: Pyright](https://img.shields.io/badge/type%20checker-pyright-green.svg)](https://microsoft.github.io/pyright/)
+[![Template: ds-template](https://img.shields.io/badge/template-ds--template-blueviolet.svg)](https://github.com/RicsonRamos/ds-template)
 
 {{ description }}
 
@@ -15,7 +16,7 @@
 
 ---
 
-## 📁 Repository Structure
+## 📁 Repository Structure (Level {{ project_level }})
 
 ```text
 {{ project_name }}/
@@ -26,27 +27,52 @@
 │   └── settings.json                  # VS Code formatting & type checking settings
 ├── data/
 │   ├── 01_raw/                        # Immutable raw source data
+{% if project_level in ['2', '3'] %}
 │   ├── 02_interim/                    # Intermediate transformed data
-│   ├── 03_processed/                  # Canonical datasets ready for ML modeling
+{% endif %}
+│   ├── 03_processed/                  # Canonical datasets ready for modeling/consumption
+{% if project_level in ['2', '3'] %}
 │   └── 04_external/                   # Third-party or auxiliary datasets
 ├── models/                            # Trained model artifacts and weights
+{% endif %}
 ├── notebooks/                         # Exploratory and analytical Jupyter notebooks
 ├── reports/
 │   └── figures/                       # Generated graphics, plots, and figures
 ├── src/
 │   └── {{ package_name }}/
 │       ├── __init__.py                # Package root
-│       └── config.py                  # Pathlib directory paths and environment loader
+│       ├── config.py                  # Pathlib directory paths and environment loader
+{% if project_level in ['2', '3'] %}
+│       ├── features.py                # Preprocessing and feature engineering transformers
+│       ├── train.py                   # Model training and artifact serialization
+│       ├── predict.py                 # Batch inference pipeline
+{% endif %}
+{% if project_level == '3' %}
+│       └── api/                       # Production FastAPI microservice
+│           ├── __init__.py
+│           ├── app.py                 # Health and /predict endpoints
+│           └── schemas.py             # Pydantic request/response schemas
+{% endif %}
 ├── tests/
 │   ├── __init__.py
-│   └── test_smoke.py                  # Initial smoke test
+│   ├── test_smoke.py                  # Smoke test for directories and imports
+{% if project_level in ['2', '3'] %}
+│   ├── test_ml.py                     # ML pipeline tests
+{% endif %}
+{% if project_level == '3' %}
+│   └── test_api.py                    # FastAPI endpoint tests
+{% endif %}
 ├── .copier-answers.yml                # Template configuration (enables 'copier update')
-├── .dockerignore                      # Exclusões de contexto de build Docker
+{% if project_level == '3' %}
+├── .dockerignore                      # Docker context exclusions
+{% endif %}
 ├── .env.example                       # Example environment variables
 ├── .gitignore                         # Data Science gitignore
-├── .pre-commit-config.yaml            # Git hooks configuration (pre-commit & pre-push)
+├── .pre-commit-config.yaml            # Git hooks configuration (nbstripout, ruff, pyright)
 ├── .python-version                    # Pinned Python version ({{ python_version }})
+{% if project_level == '3' %}
 ├── Dockerfile                         # Multi-stage production Dockerfile optimized with UV
+{% endif %}
 ├── pyproject.toml                     # Project dependencies and tool configurations
 └── README.md
 ```
@@ -98,6 +124,43 @@ Launch JupyterLab configured to use the project's virtual environment:
 ```bash
 uv run jupyter lab
 ```
+{% if project_level in ['2', '3'] %}
+
+### 5. Training Baseline Model & Running Inference
+
+Train the baseline model and serialize artifacts to `models/model.joblib`:
+
+```bash
+uv run python -m {{ package_name }}.train
+```
+{% endif %}
+{% if project_level == '3' %}
+
+### 6. Serving Inference API with FastAPI
+
+Start the local API development server:
+
+```bash
+uv run uvicorn {{ package_name }}.api.app:app --reload --port 8000
+```
+
+- **Health check:** `http://localhost:8000/health`
+- **Interactive OpenAPI docs:** `http://localhost:8000/docs`
+
+---
+
+## 🐳 Docker Deployment
+
+The project includes an optimized multi-stage `Dockerfile` leveraging UV layer caching and a non-root runtime (UID 1001):
+
+```bash
+# Build the Docker image
+docker build -t {{ project_name }}:v1 .
+
+# Run the containerized API service
+docker run --rm -p 8000:8000 --name {{ project_name }}-app {{ project_name }}:v1
+```
+{% endif %}
 
 ---
 
@@ -153,20 +216,6 @@ uv tool run pre-commit run --all-files
 
 # Pre-push stage hooks
 uv tool run pre-commit run --hook-stage pre-push --all-files
-```
-
----
-
-## 🐳 Docker Deployment
-
-The project includes an optimized multi-stage `Dockerfile` leveraging UV layer caching and non-root runtime:
-
-```bash
-# Build the Docker image
-docker build -t {{ project_name }}:v1 .
-
-# Run the container
-docker run --rm -p 8000:8000 --name {{ project_name }}-app {{ project_name }}:v1
 ```
 
 ---

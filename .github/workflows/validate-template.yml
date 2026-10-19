@@ -16,7 +16,7 @@ permissions:
 
 jobs:
   validate-template:
-    name: Scaffold, Quality Gates & Docker
+    name: Multi-Level Scaffold, Quality Gates & Docker
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -41,16 +41,24 @@ jobs:
       - name: Install Copier via uv
         run: uv tool install copier
 
-      - name: Test 1 - Scaffold with pure defaults
+      - name: Test 1 - Scaffold Level 2 with pure defaults
         run: |
-          uv tool run copier copy --trust --defaults "$GITHUB_WORKSPACE" /tmp/test-project-default
-          test -d /tmp/test-project-default/.git
-          test -f /tmp/test-project-default/pyproject.toml
-          test -f /tmp/test-project-default/uv.lock
-          test -f /tmp/test-project-default/README.md
+          uv tool run copier copy --trust --defaults "$GITHUB_WORKSPACE" /tmp/test-project-lvl2
+          test -d /tmp/test-project-lvl2/.git
+          test -f /tmp/test-project-lvl2/pyproject.toml
+          test -f /tmp/test-project-lvl2/uv.lock
+          test -f /tmp/test-project-lvl2/README.md
+          test -d /tmp/test-project-lvl2/models
+          test -f /tmp/test-project-lvl2/src/meu_projeto/features.py
+          test -f /tmp/test-project-lvl2/src/meu_projeto/train.py
+          test -f /tmp/test-project-lvl2/src/meu_projeto/predict.py
+          test -f /tmp/test-project-lvl2/tests/test_ml.py
+          # Ensure Level 3-only files are excluded in Level 2
+          test ! -f /tmp/test-project-lvl2/Dockerfile
+          test ! -d /tmp/test-project-lvl2/src/meu_projeto/api
 
-      - name: Test 1 - Run Quality Gates & Tests
-        working-directory: /tmp/test-project-default
+      - name: Test 1 - Run Quality Gates & Tests (Level 2)
+        working-directory: /tmp/test-project-lvl2
         run: |
           uv run pytest
           uv run ruff check .
@@ -60,7 +68,7 @@ jobs:
           uv tool run pre-commit run --all-files
 
       - name: Test 1 - Verify Parquet I/O with PyArrow
-        working-directory: /tmp/test-project-default
+        working-directory: /tmp/test-project-lvl2
         run: |
           uv run python -c "
           import pandas as pd
@@ -74,33 +82,81 @@ jobs:
           "
           rm -f data/02_interim/test.parquet
 
-      - name: Test 2 - Verify Copier Update Lifecycle
-        working-directory: /tmp/test-project-default
+      - name: Test 1 - Verify Copier Update Lifecycle
+        working-directory: /tmp/test-project-lvl2
         run: |
           git commit -m "feat: initial project commit"
           uv tool run copier update --trust --defaults
 
-      - name: Test 3 - Parameterized Scaffold (Python 3.13, Custom Names)
+      - name: Test 2 - Scaffold Level 1 (Análise & EDA)
         run: |
           uv tool run copier copy --trust --defaults \
-            -d project_name="previsao-churn" \
-            -d package_name="previsao_churn" \
-            -d python_version="3.13" \
-            "$GITHUB_WORKSPACE" /tmp/test-project-custom
-          cd /tmp/test-project-custom
+            -d project_level="1" \
+            -d project_name="analise-eda" \
+            -d package_name="analise_eda" \
+            "$GITHUB_WORKSPACE" /tmp/test-project-lvl1
+          # Check Level 1 exclusions
+          test ! -d /tmp/test-project-lvl1/models
+          test ! -d /tmp/test-project-lvl1/data/02_interim
+          test ! -d /tmp/test-project-lvl1/data/04_external
+          test ! -f /tmp/test-project-lvl1/src/analise_eda/features.py
+          test ! -f /tmp/test-project-lvl1/src/analise_eda/train.py
+          test ! -f /tmp/test-project-lvl1/src/analise_eda/predict.py
+          test ! -d /tmp/test-project-lvl1/src/analise_eda/api
+          test ! -f /tmp/test-project-lvl1/tests/test_ml.py
+          test ! -f /tmp/test-project-lvl1/Dockerfile
+
+      - name: Test 2 - Run Quality Gates & Tests (Level 1)
+        working-directory: /tmp/test-project-lvl1
+        run: |
           uv run pytest
-          uv run previsao-churn
+          uv run ruff check .
+          uv run ruff format --check .
+          uv run pyright
+          uv run analise-eda
+
+      - name: Test 3 - Scaffold Level 3 (MLOps & Produção)
+        run: |
+          uv tool run copier copy --trust --defaults \
+            -d project_level="3" \
+            -d project_name="mlops-prod" \
+            -d package_name="mlops_prod" \
+            "$GITHUB_WORKSPACE" /tmp/test-project-lvl3
+          # Check Level 3 inclusions
+          test -d /tmp/test-project-lvl3/models
+          test -f /tmp/test-project-lvl3/src/mlops_prod/features.py
+          test -f /tmp/test-project-lvl3/src/mlops_prod/train.py
+          test -f /tmp/test-project-lvl3/src/mlops_prod/predict.py
+          test -d /tmp/test-project-lvl3/src/mlops_prod/api
+          test -f /tmp/test-project-lvl3/src/mlops_prod/api/app.py
+          test -f /tmp/test-project-lvl3/src/mlops_prod/api/schemas.py
+          test -f /tmp/test-project-lvl3/tests/test_api.py
+          test -f /tmp/test-project-lvl3/tests/test_ml.py
+          test -f /tmp/test-project-lvl3/Dockerfile
+          test -f /tmp/test-project-lvl3/.dockerignore
+
+      - name: Test 3 - Run Quality Gates & Tests (Level 3)
+        working-directory: /tmp/test-project-lvl3
+        run: |
+          uv run pytest
+          uv run ruff check .
+          uv run ruff format --check .
+          uv run pyright
+          uv run mlops-prod
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Test 4 - Build Multi-Stage Docker Image
+      - name: Test 4 - Build Multi-Stage Docker Image (Level 3)
         run: |
-          docker build -t test-ds-app:ci /tmp/test-project-default
+          docker build -t test-mlops-app:ci /tmp/test-project-lvl3
 
-      - name: Test 4 - Run Container & Verify Non-Root User (UID 1001)
+      - name: Test 4 - Run Container, Health Check & Verify Non-Root User
         run: |
-          USER_UID=$(docker run --rm test-ds-app:ci id -u)
+          docker run -d --rm --name mlops-ci-container -p 8000:8000 test-mlops-app:ci
+          sleep 3
+          curl --fail --retry 5 --retry-connrefused --retry-delay 1 http://localhost:8000/health
+          USER_UID=$(docker exec mlops-ci-container id -u)
           echo "Container User UID: $USER_UID"
           test "$USER_UID" = "1001"
-          docker run --rm test-ds-app:ci
+          docker stop mlops-ci-container

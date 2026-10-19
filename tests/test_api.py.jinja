@@ -1,0 +1,35 @@
+"""Tests for FastAPI inference endpoints."""
+
+import pytest
+from fastapi.testclient import TestClient
+
+from {{ package_name }}.api.app import app
+from {{ package_name }}.train import train_baseline_model
+
+
+@pytest.fixture(scope="module")
+def client() -> TestClient:
+    """Create test client instance."""
+    return TestClient(app)
+
+
+def test_health_endpoint(client: TestClient) -> None:
+    """Verify /health returns HTTP 200 and expected status."""
+    response = client.get("/health")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "ok"
+    assert data["version"] == "0.1.0"
+
+
+def test_predict_endpoint(client: TestClient) -> None:
+    """Verify /predict returns inference output after training."""
+    train_baseline_model()
+
+    payload = {"features": [[0.5, 1.2, -0.3, 0.8, -1.1]]}
+    response = client.post("/predict", json=payload)
+    assert response.status_code == 200
+    data = response.json()
+    assert "predictions" in data
+    assert len(data["predictions"]) == 1
+    assert data["predictions"][0] in [0, 1]

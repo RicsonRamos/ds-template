@@ -1,0 +1,48 @@
+"""FastAPI application for model serving and health checks."""
+
+from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager, suppress
+
+from fastapi import FastAPI, HTTPException
+
+from {{ package_name }}.api.schemas import (
+    HealthResponse,
+    PredictionRequest,
+    PredictionResponse,
+)
+from {{ package_name }}.predict import load_model, predict
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
+    """Lifespan context manager for application startup and shutdown."""
+    with suppress(FileNotFoundError):
+        load_model()
+    yield
+
+
+app = FastAPI(
+    title="{{ project_name }} API",
+    description="Inference API for {{ project_name }}",
+    version="0.1.0",
+    lifespan=lifespan,
+)
+
+
+@app.get("/health", response_model=HealthResponse, tags=["Health"])
+def health() -> HealthResponse:
+    """Health check endpoint."""
+    return HealthResponse(status="ok", version="0.1.0")
+
+
+@app.post("/predict", response_model=PredictionResponse, tags=["Inference"])
+def run_prediction(payload: PredictionRequest) -> PredictionResponse:
+    """Run model inference on input features."""
+    try:
+        preds = predict(payload.features)
+        return PredictionResponse(predictions=preds)
+    except FileNotFoundError as err:
+        raise HTTPException(
+            status_code=503,
+            detail="Model artifact not found. Please run training pipeline first.",
+        ) from err

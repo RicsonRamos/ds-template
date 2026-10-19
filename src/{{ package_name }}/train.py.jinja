@@ -1,0 +1,54 @@
+"""Model training pipeline entrypoint."""
+
+from pathlib import Path
+
+import joblib
+from sklearn.datasets import make_classification
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import accuracy_score
+from sklearn.model_selection import train_test_split
+
+from {{ package_name }}.config import MODELS_DIR
+
+
+def train_baseline_model(
+    output_path: Path | None = None,
+    random_state: int = 42,
+) -> dict[str, float]:
+    """Train a baseline classification model and persist artifacts.
+
+    Args:
+        output_path: Destination path for serialized model artifact.
+        random_state: Random seed for reproducibility.
+
+    Returns:
+        Dictionary with validation metrics.
+    """
+    dest = output_path or (MODELS_DIR / "model.joblib")
+    dest.parent.mkdir(parents=True, exist_ok=True)
+
+    # Generate synthetic dataset for baseline validation
+    x, y = make_classification(
+        n_samples=200,
+        n_features=5,
+        n_informative=3,
+        random_state=random_state,
+    )
+    x_train, x_test, y_train, y_test = train_test_split(
+        x, y, test_size=0.2, random_state=random_state
+    )
+
+    model = LogisticRegression(random_state=random_state)
+    model.fit(x_train, y_train)
+
+    predictions = model.predict(x_test)
+    accuracy = float(accuracy_score(y_test, predictions))
+
+    joblib.dump(model, dest)
+
+    return {"accuracy": accuracy}
+
+
+if __name__ == "__main__":
+    metrics = train_baseline_model()
+    print(f"Model trained successfully. Metrics: {metrics}")

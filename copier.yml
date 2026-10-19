@@ -6,6 +6,24 @@ _exclude:
   - ".git/**"
   - ".github/workflows/validate-template.yml"
   - "copier.yml"
+  # Regras condicionais por nível de projeto
+  # Nível 1: Exclui pastas e scripts de ML e dados intermediários/externos
+  - "{% if project_level == '1' %}models{% endif %}"
+  - "{% if project_level == '1' %}models/**{% endif %}"
+  - "{% if project_level == '1' %}data/02_interim{% endif %}"
+  - "{% if project_level == '1' %}data/02_interim/**{% endif %}"
+  - "{% if project_level == '1' %}data/04_external{% endif %}"
+  - "{% if project_level == '1' %}data/04_external/**{% endif %}"
+  - "{% if project_level == '1' %}src/{{ package_name }}/features.py{% endif %}"
+  - "{% if project_level == '1' %}src/{{ package_name }}/train.py{% endif %}"
+  - "{% if project_level == '1' %}src/{{ package_name }}/predict.py{% endif %}"
+  - "{% if project_level == '1' %}tests/test_ml.py{% endif %}"
+  # Níveis 1 e 2: Exclui API FastAPI, Docker e testes de API (exclusivos do Nível 3)
+  - "{% if project_level != '3' %}Dockerfile{% endif %}"
+  - "{% if project_level != '3' %}.dockerignore{% endif %}"
+  - "{% if project_level != '3' %}src/{{ package_name }}/api{% endif %}"
+  - "{% if project_level != '3' %}src/{{ package_name }}/api/**{% endif %}"
+  - "{% if project_level != '3' %}tests/test_api.py{% endif %}"
 
 # ==========================================
 # PERGUNTAS INTERATIVAS NO TERMINAL
@@ -21,6 +39,15 @@ package_name:
   help: "Nome do pacote Python dentro de src/ (use underscores):"
   default: "{{ project_name | replace('-', '_') }}"
   validator: "{% if not (package_name | regex_search('^[a-z][a-z0-9_]*$')) %}Nome de pacote Python inválido.{% endif %}"
+
+project_level:
+  type: str
+  help: "Nível de complexidade do template:"
+  default: "2"
+  choices:
+    "1 - Análise & EDA (Leve: notebooks, dados, visualizações)": "1"
+    "2 - Data Science & ML (Padrão: modelos, features, treino, scikit-learn)": "2"
+    "3 - MLOps & Produção (Completo: API FastAPI, Docker, MLflow, pipelines)": "3"
 
 description:
   type: str

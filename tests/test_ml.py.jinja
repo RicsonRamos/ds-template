@@ -1,0 +1,33 @@
+"""Tests for feature engineering, training, and inference pipelines."""
+
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+
+from {{ package_name }}.features import MissingIndicatorTransformer
+from {{ package_name }}.predict import predict
+from {{ package_name }}.train import train_baseline_model
+
+
+def test_missing_indicator_transformer() -> None:
+    """Verify missing indicator flags NaNs correctly."""
+    sample_df = pd.DataFrame({"col_a": [1.0, None, 3.0], "col_b": ["x", "y", "z"]})
+    transformer = MissingIndicatorTransformer(columns=["col_a"])
+    transformed = transformer.transform(sample_df)
+
+    assert "col_a_isnan" in transformed.columns
+    assert transformed["col_a_isnan"].tolist() == [0, 1, 0]
+
+
+def test_train_and_predict_flow(tmp_path: Path) -> None:
+    """Verify model training and inference cycle."""
+    model_path = tmp_path / "model.joblib"
+    metrics = train_baseline_model(output_path=model_path)
+    assert "accuracy" in metrics
+    assert 0.0 <= metrics["accuracy"] <= 1.0
+
+    sample_features = np.zeros((3, 5))
+    predictions = predict(sample_features, model_path=model_path)
+    assert len(predictions) == 3
+    assert all(p in [0, 1] for p in predictions)
