@@ -48,6 +48,7 @@ repos:
         language: system
         types: [python]
         pass_filenames: false
+        stages: [pre-push]
 
       - id: pytest
         name: Executar testes automatizados com Pytest
